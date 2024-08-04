@@ -1,8 +1,10 @@
 from typing import Dict, Type, Optional, Any
 from flask import Request
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from sqlalchemy.types import Integer as IntegerType, String as StringType, Float as FloatType
+from sqlalchemy.types import Integer as IntegerType, String as StringType, Float as FloatType, Date as DateType
 from sqlalchemy import ForeignKey
+from datetime import datetime
+
 
 class MyForm:
     def __init__(self, model: Type[DeclarativeMeta]):
@@ -45,12 +47,15 @@ class MyForm:
         """
         for column_name, column_type in self.get_columns().items():
             if column_name == "id":
-                if request.form.get("record_id"):
+                if request.form.get("record_from datetime import datetimeid"):
                     setattr(self, "id", request.form.get("record_id"))
                 continue
 
             value = request.form.get(column_name)
-            if isinstance(column_type, FloatType):
+            if isinstance(column_type, DateType):
+                setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+                setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+            elif isinstance(column_type, FloatType):
                 setattr(instance, column_name, float(value) if value else None)
                 setattr(self, column_name, float(value) if value else None)
             elif isinstance(column_type, IntegerType):
@@ -74,7 +79,10 @@ class MyForm:
         """
         for column_name, column_type in self.get_columns().items():
             value = getattr(instance, column_name)
-            if isinstance(column_type, FloatType):
+            if isinstance(column_type, DateType):
+                setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+                setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+            elif isinstance(column_type, FloatType):
                 setattr(self, column_name, float(value) if value else None)
             elif isinstance(column_type, IntegerType):
                 setattr(self, column_name, int(value) if value else None)
@@ -103,7 +111,9 @@ class MyForm:
             value = getattr(self, name)
 
             tag_type = 'text'
-            if isinstance(column_type, IntegerType) and column_type != 'ForeignKey':
+            if isinstance(column_type, DateType):
+                tag_type = 'date'
+            elif isinstance(column_type, IntegerType) and column_type != 'ForeignKey':
                 tag_type = 'number'
             elif isinstance(column_type, FloatType):
                 tag_type = 'number'
