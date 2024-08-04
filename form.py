@@ -39,7 +39,7 @@ class MyForm:
                 columns[column.name] = column.type
         return columns
 
-    def post(self, request: Request, instance: DeclarativeMeta):
+    def post(self, request: Request, instance: DeclarativeMeta, i: int = None):
         """
         Updates the model instance based on form data from the request.
         :param request: Flask request object
@@ -48,10 +48,12 @@ class MyForm:
         for column_name, column_type in self.get_columns().items():
             if column_name == "id":
                 if request.form.get("record_from datetime import datetimeid"):
-                    setattr(self, "id", request.form.get("record_id"))
+                    html_name = f"record_id-{i}" if i else "record_id"
+                    setattr(self, "id", request.form.get(html_name))
                 continue
 
-            value = request.form.get(column_name)
+            html_name = f"{column_name}-{i}" if i else column_name
+            value = request.form.get(html_name)
             if isinstance(column_type, DateType):
                 setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
                 setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
