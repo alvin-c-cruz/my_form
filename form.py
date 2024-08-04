@@ -2,7 +2,7 @@ from typing import Dict, Type, Optional, Any
 from flask import Request
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.types import Integer as IntegerType, String as StringType, Float as FloatType
-
+from sqlalchemy import ForeignKey
 
 class MyForm:
     def __init__(self, model: Type[DeclarativeMeta]):
@@ -13,7 +13,7 @@ class MyForm:
         self.model = model
         self._create_attributes_from_model()
         
-        self.errors = {} #  Used in validate_on_submit method in child class form
+        self.errors = {}  # Used in validate_on_submit method in child class form
 
     def _create_attributes_from_model(self):
         """
@@ -29,7 +29,13 @@ class MyForm:
         Returns a dictionary of column names and their types.
         :return: Dictionary where keys are column names and values are SQLAlchemy types
         """
-        return {column.name: column.type for column in self.model.__table__.columns}
+        columns = {}
+        for column in self.model.__table__.columns:
+            if column.foreign_keys:
+                columns[column.name] = 'ForeignKey'
+            else:
+                columns[column.name] = column.type
+        return columns
 
     def post(self, request: Request, instance: DeclarativeMeta):
         """
@@ -53,6 +59,9 @@ class MyForm:
             elif isinstance(column_type, StringType):
                 setattr(instance, column_name, value)
                 setattr(self, column_name, value)
+            elif column_type == 'ForeignKey':
+                setattr(instance, column_name, int(value) if value else None)
+                setattr(self, column_name, int(value) if value else None)
             else:
                 setattr(instance, column_name, value)
                 setattr(self, column_name, value)
@@ -71,6 +80,8 @@ class MyForm:
                 setattr(self, column_name, int(value) if value else None)
             elif isinstance(column_type, StringType):
                 setattr(self, column_name, value)
+            elif column_type == 'ForeignKey':
+                setattr(self, column_name, int(value) if value else None)
             else:
                 setattr(self, column_name, value)
 
@@ -92,10 +103,12 @@ class MyForm:
             value = getattr(self, name)
 
             tag_type = 'text'
-            if isinstance(column_type, IntegerType):
+            if isinstance(column_type, IntegerType) and column_type != 'ForeignKey':
                 tag_type = 'number'
             elif isinstance(column_type, FloatType):
                 tag_type = 'number'
+            elif column_type == 'ForeignKey':
+                tag_type = 'select'
 
             # Convert css_class to class
             if 'css_class' in attributes:
@@ -105,12 +118,21 @@ class MyForm:
             for key, val in attributes.items():
                 if isinstance(val, bool) and val:
                     attributes[key] = key
-            
+                elif key == 'autocomplete' and val is False:
+                    attributes[key] = 'off'
+                elif key == 'autocomplete' and val is True:
+                    attributes[key] = 'on'
+
             # Handle special case for 'id' attribute
             field_name = 'record_id' if name == 'id' else name
 
             attrs = ' '.join([f'{key}="{value}"' for key, value in attributes.items() if value is not None])
-            return f'<input type="{tag_type}" name="{field_name}" value="{value}" {attrs}>'
+            if tag_type == 'select':
+                options = [(0, "")] + attributes.pop('options', [])
+                options_html = ''.join([f'<option value="{opt[0]}">{opt[1]}</option>' for opt in options])
+                return f'<select name="{field_name}" {attrs}>{options_html}</select>'
+            else:
+                return f'<input type="{tag_type}" name="{field_name}" value="{value}" {attrs}>'
 
         return generate_tag
     
@@ -122,4 +144,3 @@ class MyForm:
         columns = self.get_columns()
         attributes = {column_name: getattr(self, column_name) for column_name in columns.keys()}
         return str(attributes)
-    
