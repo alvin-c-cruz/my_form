@@ -37,7 +37,7 @@ class MyForm:
                 columns[column.name] = column.type
         return columns
 
-    def post(self, request: Request, instance: DeclarativeMeta, i: int = None):
+    def post(self, request: Request, instance: DeclarativeMeta, i: int = -1):
         """
         Updates the model instance based on form data from the request.
         :param request: Flask request object
@@ -46,11 +46,11 @@ class MyForm:
         for column_name, column_type in self.get_columns().items():
             if column_name == "id":
                 if request.form.get("record_id"):
-                    html_name = f"record_id-{i}" if i else "record_id"
+                    html_name = f"record_id-{i}" if i > -1 else "record_id"
                     setattr(self, "id", request.form.get(html_name))
                 continue
 
-            html_name = f"{column_name}-{i}" if i else column_name
+            html_name = f"{column_name}-{i}" if i > -1 else column_name
             value = request.form.get(html_name)
 
             if column_type == 'ForeignKey':
@@ -142,15 +142,19 @@ class MyForm:
 
             # Handle special case for 'id' attribute
             field_name = 'record_id' if name == 'id' else name
-            
+
             if 'i' in attributes: 
                 field_name = f"{field_name}-{attributes['i']}"
                 attributes.pop('i')
 
             attrs = ' '.join([f'{key}="{value}"' for key, value in attributes.items() if value is not None])
+
             if tag_type == 'select':
                 options = [(0, "")] + attributes.pop('options', [])
-                options_html = ''.join([f'<option value="{opt[0]}">{opt[1]}</option>' for opt in options])
+                options_html = ''.join([
+                    f'<option value="{opt[0]}" {"selected" if opt[0] == value else ""}>{opt[1]}</option>' 
+                    for opt in options
+                ])
                 return f'<select name="{field_name}" {attrs}>{options_html}</select>'
             else:
                 return f'<input type="{tag_type}" name="{field_name}" value="{value}" {attrs}>'
