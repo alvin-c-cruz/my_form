@@ -12,6 +12,8 @@ class MyForm:
         """
         self.model = model
         self._create_attributes_from_model()
+        
+        self.errors = {} #  Used in validate_on_submit method in child class form
 
     def _create_attributes_from_model(self):
         """
@@ -38,7 +40,7 @@ class MyForm:
         for column_name, column_type in self.get_columns().items():
             if column_name == "id":
                 if request.form.get("record_id"):
-                    setattr(instance, "id", request.form.get("record_id"))
+                    setattr(self, "id", request.form.get("record_id"))
                 continue
 
             value = request.form.get(column_name)
@@ -74,41 +76,50 @@ class MyForm:
 
         return self
 
-    def html_tag(self) -> Dict[str, str]:
+    @property
+    def html_tag(self):
         """
-        Generates HTML tags for each form attribute.
-        :return: Dictionary where keys are column names and values are HTML tag strings
+        Property that returns a function to generate HTML tags for form attributes.
         """
-        tags = {}
-        columns = self.get_columns()
-        for column_name, column_type in columns.items():
-            value = getattr(self, column_name)
-            tag = self._generate_tag(column_name, column_type, value)
-            tags[column_name] = tag
-        
-        # Special handling for 'id' if needed
-        tags['id'] = self._generate_tag('record_id', IntegerType, getattr(self, "id", ""))
-        
-        return tags
+        def generate_tag(name: str, **attributes: Optional[Any]) -> str:
+            """
+            Generates an HTML tag with optional additional attributes.
+            :param name: Name of the form field
+            :param attributes: Additional attributes like css_class, autofocus, etc.
+            :return: HTML tag string
+            """
+            column_type = self.get_columns()[name]
+            value = getattr(self, name)
+
+            tag_type = 'text'
+            if isinstance(column_type, IntegerType):
+                tag_type = 'number'
+            elif isinstance(column_type, FloatType):
+                tag_type = 'number'
+
+            # Convert css_class to class
+            if 'css_class' in attributes:
+                attributes['class'] = attributes.pop('css_class')
+
+            # Handle boolean attributes
+            for key, val in attributes.items():
+                if isinstance(val, bool) and val:
+                    attributes[key] = key
+            
+            # Handle special case for 'id' attribute
+            field_name = 'record_id' if name == 'id' else name
+
+            attrs = ' '.join([f'{key}="{value}"' for key, value in attributes.items() if value is not None])
+            return f'<input type="{tag_type}" name="{field_name}" value="{value}" {attrs}>'
+
+        return generate_tag
     
-    def _generate_tag(self, name: str, column_type: Type, value: Any, **attributes: Optional[Any]) -> str:
+    def __str__(self):
         """
-        Generates an HTML tag with optional additional attributes.
-        :param name: Name of the form field
-        :param column_type: SQLAlchemy column type to determine the input type
-        :param value: Value to be placed in the input field
-        :param attributes: Additional attributes like css_class, autofocus, etc.
-        :return: HTML tag string
+        Returns a string representation of the form’s attributes in dictionary format.
+        :return: String representation of the form’s attributes
         """
-        tag_type = 'text'
-        if isinstance(column_type, IntegerType):
-            tag_type = 'number'
-        elif isinstance(column_type, FloatType):
-            tag_type = 'number'
-        
-        # Convert css_class to class
-        if 'css_class' in attributes:
-            attributes['class'] = attributes.pop('css_class')
-        
-        attrs = ' '.join([f'{key}="{value}"' for key, value in attributes.items() if value is not None])
-        return f'<input type="{tag_type}" name="{name}" value="{value}" {attrs}>'
+        columns = self.get_columns()
+        attributes = {column_name: getattr(self, column_name) for column_name in columns.keys()}
+        return str(attributes)
+    
