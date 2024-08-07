@@ -3,8 +3,7 @@ from flask import Request
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.types import Integer as IntegerType, String as StringType, Float as FloatType, Date as DateType
 from sqlalchemy import ForeignKey
-from datetime import datetime
-
+from datetime import datetime, date
 
 class MyForm:
     def __init__(self, model: Type[DeclarativeMeta]):
@@ -14,7 +13,6 @@ class MyForm:
         """
         self.model = model
         self._create_attributes_from_model()
-        
         self.errors = {}  # Used in validate_on_submit method in child class form
 
     def _create_attributes_from_model(self):
@@ -47,16 +45,24 @@ class MyForm:
         """
         for column_name, column_type in self.get_columns().items():
             if column_name == "id":
-                if request.form.get("record_from datetime import datetimeid"):
+                if request.form.get("record_id"):
                     html_name = f"record_id-{i}" if i else "record_id"
                     setattr(self, "id", request.form.get(html_name))
                 continue
 
             html_name = f"{column_name}-{i}" if i else column_name
             value = request.form.get(html_name)
-            if isinstance(column_type, DateType):
-                setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
-                setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+
+            if column_type == 'ForeignKey':
+                setattr(instance, column_name, int(value) if value else None)
+                setattr(self, column_name, int(value) if value else None)
+            elif isinstance(column_type, DateType):
+                if isinstance(value, str):
+                    setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+                    setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+                else:
+                    setattr(instance, column_name, value)
+                    setattr(self, column_name, value)
             elif isinstance(column_type, FloatType):
                 setattr(instance, column_name, float(value) if value else None)
                 setattr(self, column_name, float(value) if value else None)
@@ -66,9 +72,6 @@ class MyForm:
             elif isinstance(column_type, StringType):
                 setattr(instance, column_name, value)
                 setattr(self, column_name, value)
-            elif column_type == 'ForeignKey':
-                setattr(instance, column_name, int(value) if value else None)
-                setattr(self, column_name, int(value) if value else None)
             else:
                 setattr(instance, column_name, value)
                 setattr(self, column_name, value)
@@ -81,17 +84,19 @@ class MyForm:
         """
         for column_name, column_type in self.get_columns().items():
             value = getattr(instance, column_name)
-            if isinstance(column_type, DateType):
-                setattr(instance, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
-                setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
+            if column_type == 'ForeignKey':
+                setattr(self, column_name, int(value) if value else None)
+            elif isinstance(column_type, DateType):
+                if isinstance(value, date):
+                    setattr(self, column_name, value)
+                else:
+                    setattr(self, column_name, datetime.strptime(value, '%Y-%m-%d').date() if value else None)
             elif isinstance(column_type, FloatType):
                 setattr(self, column_name, float(value) if value else None)
             elif isinstance(column_type, IntegerType):
                 setattr(self, column_name, int(value) if value else None)
             elif isinstance(column_type, StringType):
                 setattr(self, column_name, value)
-            elif column_type == 'ForeignKey':
-                setattr(self, column_name, int(value) if value else None)
             else:
                 setattr(self, column_name, value)
 
@@ -137,6 +142,10 @@ class MyForm:
 
             # Handle special case for 'id' attribute
             field_name = 'record_id' if name == 'id' else name
+            
+            if 'i' in attributes: 
+                field_name = f"{field_name}-{attributes['i']}"
+                attributes.pop('i')
 
             attrs = ' '.join([f'{key}="{value}"' for key, value in attributes.items() if value is not None])
             if tag_type == 'select':
